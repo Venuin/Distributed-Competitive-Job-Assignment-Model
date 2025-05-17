@@ -1,0 +1,340 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  margin: 0;
+  padding: 20px;
+  background-color: #f0f2f5;
+  color: #333;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1300px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+h1 {
+  font-size: 1.8em;
+  color: #2c3e50;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+h2 {
+  font-size: 1.3em;
+  color: #34495e;
+  margin-top: 0;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 10px;
+}
+
+.simulation-layout-container {
+  display: flex;
+  flex-direction: row;
+  gap: 25px;
+  align-items: flex-start;
+}
+
+.canvas-wrapper {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.canvas-wrapper h1 {
+  font-size: 1.6em;
+  margin-bottom: 15px;
+}
+
+#simulationCanvas {
+  border: 1px solid #bcccdc;
+  background-color: #ffffff;
+  display: block;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+/* Sağ Panel (Sidebar) */
+.sidebar-panel {
+  width: 300px;
+  min-width: 280px;
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #dce4ec;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-panel div {
+  margin-bottom: 18px;
+}
+.settings-panel div:last-child {
+  margin-bottom: 0;
+}
+
+.settings-panel label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #495057;
+  font-size: 0.95em;
+}
+
+.settings-panel input[type="range"] {
+  width: calc(100% - 50px);
+  margin-right: 10px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.settings-panel span {
+  display: inline-block;
+  width: 35px;
+  text-align: right;
+  vertical-align: middle;
+  font-weight: 500;
+  color: #343a40;
+  background-color: #e9ecef;
+  padding: 3px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+/* Kontrol Butonları */
+.controls-panel button {
+  display: block;
+  width: 100%;
+  padding: 10px 15px;
+  margin-bottom: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 500;
+  text-align: center;
+  transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+}
+.controls-panel button:last-child {
+  margin-bottom: 0;
+}
+.controls-panel button:hover {
+  background-color: #0056b3;
+}
+.controls-panel button:active {
+  transform: translateY(1px);
+}
+
+/* Bilgi Paneli */
+#infoPanel {
+}
+.info-panel-layout {
+  background-color: #e9ecef;
+  padding: 15px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  border: 1px solid #ced4da;
+}
+
+.info-panel-layout p {
+  margin: 8px 0;
+  line-height: 1.5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.info-panel-layout p strong {
+  color: #495057;
+  margin-right: 5px;
+}
+.info-panel-layout p:last-child {
+  margin-bottom: 0;
+}
+
+.auction-log-section {
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #dce4ec;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 1125px; /* Yaklaşık olarak canvas(800) + sidebar(300) + gap(25) = 1125px */
+  margin: 0 auto;
+}
+
+.log-panel {
+  height: 200px;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 0.85em;
+  line-height: 1.45;
+  color: #495057;
+}
+
+.log-panel p {
+  margin: 0 0 7px 0;
+  padding-bottom: 5px;
+  border-bottom: 1px dotted #ced4da;
+  word-wrap: break-word;
+}
+.log-panel p:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+/* Kazanç Grafiği Bölümü */
+.earnings-chart-section {
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #dce4ec;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 1125px;
+  margin: 0 auto;
+}
+
+.chart-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 20px auto 0 auto;
+}
+
+/* Mobil ve Küçük Ekranlar İçin Duyarlılık (Örnek) */
+@media (max-width: 1200px) {
+  .simulation-layout-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  .canvas-wrapper {
+    width: 100%;
+    align-items: center;
+  }
+  #simulationCanvas {
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+  }
+  .sidebar-panel {
+    width: 100%;
+    max-width: 800px;
+    margin-top: 25px;
+  }
+  .auction-log-section,
+  .earnings-chart-section {
+    max-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+  .app-container {
+    gap: 20px;
+  }
+  h1 {
+    font-size: 1.6em;
+  }
+  h2 {
+    font-size: 1.2em;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+  .canvas-wrapper h1 {
+    font-size: 1.4em;
+  }
+
+  .sidebar-panel {
+    padding: 15px;
+    gap: 20px;
+  }
+  .sidebar-panel h2 {
+    font-size: 1.15em;
+  }
+
+  .settings-panel label {
+    font-size: 0.9em;
+  }
+  .settings-panel input[type="range"] {
+    width: calc(100% - 45px);
+  }
+  .settings-panel span {
+    width: 30px;
+  }
+
+  .controls-panel button {
+    font-size: 0.9em;
+    padding: 8px 12px;
+  }
+  #infoPanel {
+    padding: 12px;
+    font-size: 0.85em;
+  }
+  #infoPanel p {
+    margin: 6px 0;
+  }
+
+  .auction-log-section {
+    padding: 15px;
+  }
+  .auction-log-section h2 {
+    font-size: 1.15em;
+  }
+  .log-panel {
+    height: 180px;
+    padding: 10px;
+    font-size: 0.8em;
+  }
+  .log-panel p {
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+  }
+
+  .earnings-chart-section {
+    padding: 15px;
+  }
+  .earnings-chart-section h2 {
+    font-size: 1.15em;
+  }
+  .chart-container {
+    margin-top: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-panel input[type="range"] {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 5px;
+  }
+  .settings-panel span {
+    display: block;
+    width: 100%;
+    text-align: left;
+    margin-bottom: 10px;
+  }
+  .settings-panel label {
+    margin-bottom: 5px;
+  }
+}

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dağıtık Rekabetçi İş Atama Simülasyonu</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <div class="simulation-layout-container">
+        <div class="canvas-wrapper">
+          <h1>Simülasyon Alanı</h1>
+          <canvas id="simulationCanvas" width="1000" height="650"></canvas>
+        </div>
+
+        <div class="sidebar-panel">
+          <h2>Ayarlar</h2>
+          <div class="settings-panel">
+            <div>
+              <label for="numWorkersSlider">İşçi Sayısı:</label>
+              <input
+                type="range"
+                id="numWorkersSlider"
+                name="numWorkers"
+                min="1"
+                max="20"
+                value="8"
+              />
+              <span id="numWorkersValue">8</span>
+            </div>
+            <div>
+              <label for="maxJobsSlider">Maksimum İş Sayısı:</label>
+              <input
+                type="range"
+                id="maxJobsSlider"
+                name="maxJobs"
+                min="5"
+                max="50"
+                value="15"
+              />
+              <span id="maxJobsValue">15</span>
+            </div>
+          </div>
+
+          <h2>Kontroller</h2>
+          <div class="controls-panel">
+            <button id="startButton">Başlat</button>
+            <button id="pauseButton">Duraklat</button>
+            <button id="resetButton">Sıfırla (Ayarları Uygula)</button>
+          </div>
+
+          <h2>Bilgiler</h2>
+          <div id="infoPanel" class="info-panel-layout">
+            <p><strong>Zaman:</strong> <span id="timeDisplay">0.0</span></p>
+            <p>
+              <strong>Oluşturulan İşler:</strong>
+              <span id="jobsCreatedDisplay">0</span>/<span id="maxJobsDisplay"
+                >0</span
+              >
+            </p>
+            <p>
+              <strong>Tamamlanan İşler:</strong>
+              <span id="jobsCompletedDisplay">0</span>
+            </p>
+            <p>
+              <strong>Toplam Kazanç:</strong>
+              <span id="totalEarningsDisplay">0</span>
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="auction-log-section">
+        <h2>İhale Günlüğü</h2>
+        <div id="auctionLogPanel" class="log-panel"></div>
+      </div>
+
+      <div class="earnings-chart-section">
+        <h2>İşçi Kazançları</h2>
+        <div
+          class="chart-container"
+          style="
+            position: relative;
+            height: 400px;
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
+          "
+        >
+          <canvas id="earningsChartCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
