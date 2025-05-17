@@ -29,7 +29,6 @@ export class SimulationSystem {
     this.workers = [];
     this.jobs = [];
     this.completedJobs = [];
-    this.jobHistory = [];
     this.time = 0.0;
     this.jobCounter = 0;
     this.allJobsCreated = false;
@@ -41,14 +40,23 @@ export class SimulationSystem {
     this.currentNumWorkers = CONFIG.NUM_WORKERS;
     this.currentMaxJobs = CONFIG.MAX_JOBS;
 
-    this.auctionInterval = CONFIG.AUCTION_INTERVAL || 5.0;
+    this.auctionInterval = CONFIG.AUCTION_INTERVAL;
     this.timeSinceLastAuction = 0.0;
 
     this.earningsChart = null;
   }
 
   _initChart() {
-    if (!this.chartCanvas || !this.validInitialization) return;
+    if (
+      !this.chartCanvas ||
+      !this.validInitialization ||
+      typeof Chart === "undefined"
+    ) {
+      if (this.chartCanvas && typeof Chart === "undefined") {
+        console.warn("Chart.js kütüphanesi bulunamadı. Grafik çizilemeyecek.");
+      }
+      return;
+    }
 
     if (this.earningsChart) {
       this.earningsChart.destroy();
@@ -75,7 +83,7 @@ export class SimulationSystem {
                   .replace("rgb", "rgba")
                   .replace(")", `, ${alpha})`);
               }
-              return baseColor;
+              return baseColor; // hsl renkleri için alpha doğrudan değiştirilmiyor
             }),
             borderColor: this.workers.map((w) =>
               w.color
@@ -93,7 +101,7 @@ export class SimulationSystem {
         scales: {
           y: {
             beginAtZero: true,
-            suggestedMax: Math.max(100, ...earningsData),
+            suggestedMax: Math.max(100, ...earningsData, 0),
           },
         },
         responsive: true,
@@ -125,7 +133,6 @@ export class SimulationSystem {
           Math.random() * this.canvas.width,
           Math.random() * this.canvas.height,
           CONFIG.BASE_WORKER_SPEED,
-          CONFIG.BASE_WORKER_COST,
           this.canvas.width,
           this.canvas.height
         )
@@ -134,7 +141,6 @@ export class SimulationSystem {
 
     this.jobs = [];
     this.completedJobs = [];
-    this.jobHistory = [];
     this.time = 0.0;
     this.jobCounter = 0;
     this.allJobsCreated = false;
@@ -142,8 +148,11 @@ export class SimulationSystem {
     this.isRunning = false;
     this.timeSinceLastAuction = 0.0;
 
-    const initialJobs = Math.max(1, Math.floor(0.2 * this.currentMaxJobs));
-    for (let i = 0; i < initialJobs; i++) {
+    const initialJobsToCreate = Math.max(
+      1,
+      Math.min(this.currentMaxJobs, Math.floor(0.2 * this.currentMaxJobs))
+    );
+    for (let i = 0; i < initialJobsToCreate; i++) {
       this.spawnNewJob();
     }
 
@@ -156,23 +165,28 @@ export class SimulationSystem {
   spawnNewJob() {
     if (!this.validInitialization) return null;
     if (this.jobCounter < this.currentMaxJobs) {
-      const padding = 10;
-      const newJobX = Math.max(
-        padding,
-        Math.min(this.canvas.width - padding, Math.random() * this.canvas.width)
-      );
-      const newJobY = Math.max(
-        padding,
-        Math.min(
-          this.canvas.height - padding,
-          Math.random() * this.canvas.height
-        )
-      );
+      const padding = 20;
+      const newJobX =
+        Math.random() * (this.canvas.width - 2 * padding) + padding;
+      const newJobY =
+        Math.random() * (this.canvas.height - 2 * padding) + padding;
 
       const newJob = new Job(this.jobCounter, newJobX, newJobY, this.time);
       newJob.duration = CONFIG.JOB_FIXED_DURATION;
+      newJob.baseRevenue =
+        Math.random() *
+          (CONFIG.MAX_REVENUE_FOR_JOB_SPAWN -
+            CONFIG.MIN_REVENUE_FOR_JOB_SPAWN) +
+        CONFIG.MIN_REVENUE_FOR_JOB_SPAWN;
+
       this.jobs.push(newJob);
       this.jobCounter++;
+      this.addAuctionLog(
+        `Yeni iş oluşturuldu: J${
+          newJob.id
+        } (Gelir: ${newJob.baseRevenue.toFixed(0)})`
+      );
+
       if (this.jobCounter >= this.currentMaxJobs) {
         this.allJobsCreated = true;
         this.addAuctionLog(
@@ -189,9 +203,9 @@ export class SimulationSystem {
     return worker.speed > 0 ? distance / worker.speed : Infinity;
   }
 
-  assignJobToWorker(job, worker, bid) {
+  assignJobToWorker(job, worker, bidAmount) {
     job.assignedWorkerId = worker.id;
-    job.winningBid = bid;
+    job.winningBid = bidAmount;
     job.estimatedTravelTime = this.calculateJobTravelTime(worker, job);
     job.startTime = null;
     job.progress = 0;
@@ -200,7 +214,7 @@ export class SimulationSystem {
       jobId: job.id,
       startTime: null,
       duration: job.duration,
-      winningBid: bid,
+      winningBid: bidAmount,
       targetX: job.x,
       targetY: job.y,
     });
@@ -208,26 +222,68 @@ export class SimulationSystem {
     worker.path = [{ x: job.x, y: job.y }];
   }
 
+  checkJobTimeouts() {
+    if (!this.validInitialization) return;
+    const currentTime = this.time;
+    const newJobsList = [];
+    let timedOutCount = 0;
+
+    for (let i = 0; i < this.jobs.length; i++) {
+      const job = this.jobs[i];
+      if (job.assignedWorkerId === null && !job.completed && !job.timedOut) {
+        if (currentTime - job.creationTime > CONFIG.JOB_TIMEOUT_DURATION) {
+          job.timedOut = true;
+          this.addAuctionLog(
+            `ZAMAN AŞIMI: J${job.id} (R:${job.baseRevenue.toFixed(
+              0
+            )}) ${CONFIG.JOB_TIMEOUT_DURATION.toFixed(
+              1
+            )}s boyunca atanmadığı için kaldırıldı.`
+          );
+          timedOutCount++;
+        }
+      }
+
+      if (!job.timedOut) {
+        newJobsList.push(job);
+      }
+    }
+
+    if (timedOutCount > 0) {
+      this.jobs = newJobsList;
+    }
+  }
+
   runAuctionRound() {
     if (!this.validInitialization) return;
-    this.addAuctionLog("--- Yeni İhale Turu Başladı ---");
+
+    this.checkJobTimeouts(); // İhale başlamadan önce zaman aşımı kontrolü
+
+    this.addAuctionLog(
+      `--- ${this.time.toFixed(1)}s: Yeni İhale Turu Başladı ---`
+    );
 
     const openForBiddingJobs = this.jobs.filter(
-      (job) => !job.completed && job.assignedWorkerId === null
+      (job) => !job.completed && job.assignedWorkerId === null && !job.timedOut
     );
+
     if (openForBiddingJobs.length === 0) {
-      this.addAuctionLog("Teklif verilecek açık iş bulunmuyor.");
+      this.addAuctionLog(
+        "Teklif verilecek açık iş bulunmuyor (zaman aşımı sonrası kontrol)."
+      );
+      this.addAuctionLog("--- İhale Turu Bitti ---");
       return;
     }
     this.addAuctionLog(
       `Açık İşler (${openForBiddingJobs.length}): ${openForBiddingJobs
-        .map((j) => `J${j.id}`)
+        .map((j) => `J${j.id}(R:${j.baseRevenue.toFixed(0)})`)
         .join(", ")}`
     );
 
     const availableWorkers = this.workers.filter((w) => w.available);
     if (availableWorkers.length === 0) {
       this.addAuctionLog("Teklif verecek uygun işçi bulunmuyor.");
+      this.addAuctionLog("--- İhale Turu Bitti ---");
       return;
     }
     this.addAuctionLog(
@@ -239,13 +295,25 @@ export class SimulationSystem {
     const potentialBids = [];
     for (const worker of availableWorkers) {
       const choice = worker.selectJobAndCalculateBid(openForBiddingJobs);
-      if (choice) {
-        potentialBids.push({ worker, job: choice.job, bid: choice.bid });
+      if (choice && choice.job && isFinite(choice.bid) && choice.bid > 0) {
+        potentialBids.push({
+          worker: worker,
+          job: choice.job,
+          bid: choice.bid,
+        });
+        this.addAuctionLog(
+          `W${worker.id} -> J${
+            choice.job.id
+          } için potansiyel teklif: ${choice.bid.toFixed(
+            0
+          )} (İş Geliri: ${choice.job.baseRevenue.toFixed(0)})`
+        );
       }
     }
 
     if (potentialBids.length === 0) {
-      this.addAuctionLog("Hiçbir işçi bu turda teklif vermedi.");
+      this.addAuctionLog("Hiçbir işçi bu turda geçerli bir teklif vermedi.");
+      this.addAuctionLog("--- İhale Turu Bitti ---");
       return;
     }
 
@@ -254,37 +322,44 @@ export class SimulationSystem {
       if (!bidsByJob[pb.job.id]) {
         bidsByJob[pb.job.id] = [];
       }
-      bidsByJob[pb.job.id].push({
-        workerId: pb.worker.id,
-        worker: pb.worker,
-        bid: pb.bid,
-      });
+      bidsByJob[pb.job.id].push({ worker: pb.worker, bid: pb.bid });
     }
 
     let jobsAssignedThisRoundCount = 0;
-    let assignedDetailsLogArray = [];
+    const assignedDetailsLogArray = [];
 
     for (const jobIdStr in bidsByJob) {
       const jobId = parseInt(jobIdStr);
-      const job = this.jobs.find((j) => j.id === jobId);
-      if (!job || job.assignedWorkerId !== null || job.completed) continue;
+      const job = this.jobs.find((j) => j.id === jobId); // Job nesnesini this.jobs'dan bul
+
+      if (
+        !job ||
+        job.assignedWorkerId !== null ||
+        job.completed ||
+        job.timedOut
+      ) {
+        continue;
+      }
 
       const jobBids = bidsByJob[jobIdStr];
       jobBids.sort((a, b) => a.bid - b.bid);
 
-      let bidsDetailMsg =
-        `J${job.id} teklifleri: ` +
-        jobBids.map((b) => `W${b.workerId}(${b.bid.toFixed(0)})`).join("; ");
+      let bidsDetailMsg = `J${job.id} (R:${job.baseRevenue.toFixed(
+        0
+      )}) teklifleri: `;
+      bidsDetailMsg += jobBids
+        .map((b) => `W${b.worker.id}(${b.bid.toFixed(0)})`)
+        .join("; ");
       this.addAuctionLog(bidsDetailMsg);
 
       let assignedThisJob = false;
-      for (const bestBid of jobBids) {
-        if (bestBid.worker.available) {
-          this.assignJobToWorker(job, bestBid.worker, bestBid.bid);
+      for (const bestBidEntry of jobBids) {
+        if (bestBidEntry.worker.available) {
+          this.assignJobToWorker(job, bestBidEntry.worker, bestBidEntry.bid);
           assignedDetailsLogArray.push(
-            `J${job.id} -> W${bestBid.worker.id} (Teklif: ${bestBid.bid.toFixed(
-              0
-            )})`
+            `J${job.id} -> W${
+              bestBidEntry.worker.id
+            } (Teklif: ${bestBidEntry.bid.toFixed(0)})`
           );
           jobsAssignedThisRoundCount++;
           assignedThisJob = true;
@@ -293,7 +368,7 @@ export class SimulationSystem {
       }
       if (!assignedThisJob && jobBids.length > 0) {
         this.addAuctionLog(
-          `J${job.id} için kazanan atanamadı (teklif verenler meşgul olabilir).`
+          `J${job.id} için kazanan atanamadı (teklif verenler meşgul olabilir veya teklifleri geçersiz).`
         );
       }
     }
@@ -313,43 +388,28 @@ export class SimulationSystem {
     for (const worker of this.workers) {
       if (!worker.available && worker.assigned_jobs.length > 0) {
         const currentAssignment = worker.assigned_jobs[0];
-        const job = this.jobs.find((j) => j.id === currentAssignment.jobId);
+        // İşçinin atandığı işin hala this.jobs listesinde ve zaman aşımına uğramamış olduğunu kontrol et
+        const job = this.jobs.find(
+          (j) => j.id === currentAssignment.jobId && !j.timedOut && !j.completed
+        );
 
         if (!job) {
-          console.warn(
-            `İşçi ${worker.id} için atanan J${currentAssignment.jobId} bulunamadı. Atama kaldırılıyor.`
-          );
+          // console.warn(`W${worker.id}: Atanmış iş J${currentAssignment.jobId} bulunamadı, zaman aşımına uğradı veya zaten tamamlanmış. Atama kaldırılıyor.`);
           worker.assigned_jobs.shift();
           worker.available = worker.assigned_jobs.length === 0;
           worker.path = [];
-          continue;
-        }
-
-        if (job.completed) {
-          if (
-            worker.assigned_jobs.some((assigned) => assigned.jobId === job.id)
-          ) {
-            worker.assigned_jobs = worker.assigned_jobs.filter(
-              (assigned) => assigned.jobId !== job.id
+          if (worker.available && worker.assigned_jobs.length === 0) {
+            this.addAuctionLog(
+              `W${worker.id} uygun hale geldi (atanan işi J${currentAssignment.jobId} bulunamadı/zaman aşımına uğradı/tamamlandı).`
             );
-            worker.available = worker.assigned_jobs.length === 0;
-            if (worker.assigned_jobs.length > 0) {
-              const nextAssignment = worker.assigned_jobs[0];
-              const nextJobToAssign = this.jobs.find(
-                (j) => j.id === nextAssignment.jobId
-              );
-              if (nextJobToAssign)
-                worker.path = [{ x: nextJobToAssign.x, y: nextJobToAssign.y }];
-            } else {
-              worker.path = [];
-            }
           }
           continue;
         }
 
+        // İşin hedefine gitme mantığı
         const targetX = currentAssignment.targetX;
         const targetY = currentAssignment.targetY;
-        const arrivalTolerance = 1.0;
+        const arrivalTolerance = 1.5 * worker.speed * timeStep;
 
         if (
           Utils.distance(worker.x, worker.y, targetX, targetY) >
@@ -357,6 +417,7 @@ export class SimulationSystem {
         ) {
           worker.moveToTarget(timeStep);
         } else {
+          // Hedefe varıldı
           worker.x = targetX;
           worker.y = targetY;
           worker.path = [];
@@ -364,6 +425,7 @@ export class SimulationSystem {
           if (job.startTime === null) {
             job.startTime = this.time;
             currentAssignment.startTime = this.time;
+            this.addAuctionLog(`W${worker.id}, J${job.id}'ye başladı.`);
           }
 
           if (job.startTime !== null) {
@@ -376,35 +438,56 @@ export class SimulationSystem {
                 console.warn(`J${job.id} süresi <= 0. Otomatik tamamlanıyor.`);
             }
 
-            if (job.progress >= 1.0) {
-              if (!job.completed) {
-                job.completed = true;
-                if (!this.completedJobs.find((cj) => cj.id === job.id)) {
-                  this.completedJobs.push(job);
-                }
-                worker.earnings += currentAssignment.winningBid;
-                // this.addAuctionLog(`İŞ TAMAMLANDI: J${job.id} (İşçi: W${worker.id})`);
+            if (job.progress >= 1.0 && !job.completed) {
+              job.completed = true;
+              if (!this.completedJobs.find((cj) => cj.id === job.id)) {
+                this.completedJobs.push(job);
+              }
+              worker.earnings += currentAssignment.winningBid;
+              this.addAuctionLog(
+                `İŞ TAMAMLANDI: J${job.id} (İşçi: W${
+                  worker.id
+                }, Kazanç: ${currentAssignment.winningBid.toFixed(
+                  0
+                )}, Toplam: ${worker.earnings.toFixed(0)})`
+              );
 
-                worker.assigned_jobs.shift();
-                worker.available = worker.assigned_jobs.length === 0;
+              worker.assigned_jobs.shift();
+              worker.available = worker.assigned_jobs.length === 0;
 
-                if (worker.assigned_jobs.length > 0) {
-                  const nextAssignment = worker.assigned_jobs[0];
-                  const nextJobToAssign = this.jobs.find(
-                    (j) => j.id === nextAssignment.jobId
+              if (worker.assigned_jobs.length > 0) {
+                const nextAssignment = worker.assigned_jobs[0];
+                const nextJobToAssign = this.jobs.find(
+                  (j) =>
+                    j.id === nextAssignment.jobId && !j.timedOut && !j.completed
+                );
+                if (nextJobToAssign) {
+                  worker.path = [
+                    { x: nextJobToAssign.x, y: nextJobToAssign.y },
+                  ];
+                  this.addAuctionLog(
+                    `W${worker.id}, sıradaki işi J${nextJobToAssign.id}'ye yöneliyor.`
                   );
-                  if (nextJobToAssign) {
-                    worker.path = [
-                      { x: nextJobToAssign.x, y: nextJobToAssign.y },
-                    ];
-                  }
                 } else {
+                  worker.available = true;
                   worker.path = [];
+                  if (worker.available)
+                    this.addAuctionLog(
+                      `W${worker.id} uygun hale geldi (sırada iş yok/geçersiz).`
+                    );
                 }
+              } else {
+                worker.path = [];
+                if (worker.available)
+                  this.addAuctionLog(
+                    `W${worker.id} uygun hale geldi (iş bitti).`
+                  );
               }
             }
           }
         }
+      } else {
+        worker.available = true;
       }
     }
   }
@@ -419,27 +502,29 @@ export class SimulationSystem {
 
     if (
       !this.allJobsCreated &&
+      this.jobCounter < this.currentMaxJobs &&
       Math.random() <
         CONFIG.JOB_CREATION_PROBABILITY *
           timeStep *
-          (CONFIG.JOB_SPAWN_RATE_MULTIPLIER || 10)
+          (CONFIG.JOB_SPAWN_RATE_MULTIPLIER || 1)
     ) {
       this.spawnNewJob();
     }
 
-    this.updateWorkers(timeStep);
-
     if (this.timeSinceLastAuction >= this.auctionInterval) {
-      this.runAuctionRound();
+      this.runAuctionRound(); // checkJobTimeouts() bunun içinde çağrılıyor
       this.timeSinceLastAuction = 0.0;
     }
 
+    this.updateWorkers(timeStep);
+
+    // Tüm işler oluşturulduysa VE aktif (tamamlanmamış VE zaman aşımına uğramamış) iş kalmadıysa
     if (
       this.allJobsCreated &&
-      this.completedJobs.length >= this.currentMaxJobs
+      this.jobs.filter((job) => !job.completed && !job.timedOut).length === 0
     ) {
       if (!this.simulationEnding) {
-        const logMsg = `TÜM İŞLER (${this.completedJobs.length}/${this.currentMaxJobs}) OLUŞTURULDU VE TAMAMLANDI! Simülasyon durduruluyor.`;
+        const logMsg = `TÜM İŞLER (${this.completedJobs.length}/${this.currentMaxJobs} tamamlandı) YA DA KALANLAR ZAMAN AŞIMINA UĞRADI! Simülasyon durduruluyor.`;
         console.log(logMsg);
         this.addAuctionLog(logMsg);
         this.simulationEnding = true;
@@ -452,41 +537,47 @@ export class SimulationSystem {
 
   addAuctionLog(message) {
     if (!this.auctionLogPanel || !this.validInitialization) return;
-
     const logEntry = document.createElement("p");
-    const timestamp = `[${this.time.toFixed(1)}] `;
-    logEntry.textContent = timestamp + message;
-
+    logEntry.textContent = message;
     this.auctionLogPanel.appendChild(logEntry);
+    //this.auctionLogPanel.scrollTop = this.auctionLogPanel.scrollHeight;
   }
 
   _updateChartData() {
-    if (!this.chartCanvas || !this.validInitialization) return;
-    if (this.earningsChart && this.workers.length >= 0) {
-      this.earningsChart.data.labels = this.workers.map((w) => `W${w.id}`);
-      this.earningsChart.data.datasets[0].data = this.workers.map(
-        (w) => w.earnings
-      );
+    if (
+      !this.earningsChart ||
+      !this.validInitialization ||
+      this.workers.length === 0
+    )
+      return;
 
-      this.earningsChart.data.datasets[0].backgroundColor = this.workers.map(
-        (w) => {
-          const baseColor = w.color || "rgba(54, 162, 235, 1)";
-          const alpha = w.available ? "0.6" : "0.9";
-          if (baseColor.startsWith("rgba")) {
-            return baseColor.replace(/,\s*[\d.]+\)$/, `, ${alpha})`);
-          } else if (baseColor.startsWith("rgb")) {
-            return baseColor.replace("rgb", "rgba").replace(")", `, ${alpha})`);
-          }
-          return baseColor;
+    this.earningsChart.data.labels = this.workers.map((w) => `W${w.id}`);
+    this.earningsChart.data.datasets[0].data = this.workers.map(
+      (w) => w.earnings
+    );
+    this.earningsChart.data.datasets[0].backgroundColor = this.workers.map(
+      (w) => {
+        const baseColor = w.color || "rgba(54, 162, 235, 0.6)";
+        const alpha = w.available ? "0.6" : "0.9";
+        if (baseColor.startsWith("rgba")) {
+          return baseColor.replace(/,\s*[\d.]+\)$/, `, ${alpha})`);
+        } else if (baseColor.startsWith("rgb")) {
+          return baseColor.replace("rgb", "rgba").replace(")", `, ${alpha})`);
         }
-      );
-      this.earningsChart.data.datasets[0].borderColor = this.workers.map((w) =>
-        w.color
-          ? w.color.replace(/rgba?\(([^)]+)(?:,\s*[\d.]+)?\)/, `rgba($1, 1)`)
-          : "rgba(54, 162, 235, 1)"
-      );
-      this.earningsChart.update("none");
-    }
+        return baseColor;
+      }
+    );
+    this.earningsChart.data.datasets[0].borderColor = this.workers.map((w) =>
+      w.color
+        ? w.color.replace(/rgba?\(([^)]+)(?:,\s*[\d.]+)?\)/, `rgba($1, 1)`)
+        : "rgba(54, 162, 235, 1)"
+    );
+    const maxEarnings = Math.max(...this.workers.map((w) => w.earnings), 0);
+    this.earningsChart.options.scales.y.suggestedMax = Math.max(
+      100,
+      maxEarnings + 20
+    );
+    this.earningsChart.update("none");
   }
 
   updateInfoPanel() {
@@ -515,7 +606,8 @@ export class SimulationSystem {
     if (!this.validInitialization) return;
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     for (const job of this.jobs) {
-      job.draw(this.ctx);
+      // this.jobs artık zaman aşımına uğrayanları içermeyecek
+      job.draw(this.ctx); // job.draw() metodu timedOut ise çizim yapmayacak
     }
     for (const worker of this.workers) {
       worker.draw(this.ctx);
@@ -529,8 +621,9 @@ export class SimulationSystem {
     this.simulateStep(CONFIG.TIME_STEP);
     this.draw();
 
-    if (this.simulationEnding) {
-      this.stop();
+    if (this.simulationEnding && this.isRunning) {
+      this.pause();
+      this.addAuctionLog("Simülasyon bitti ve duraklatıldı.");
     } else {
       this.animationFrameId = requestAnimationFrame(() => this.loop());
     }
@@ -539,28 +632,38 @@ export class SimulationSystem {
   start() {
     if (!this.validInitialization) {
       console.error("Simülasyon başlatılamadı: Geçersiz başlatma durumu.");
+      this.addAuctionLog("HATA: Simülasyon başlatılamadı (geçersiz durum).");
+      return;
+    }
+    if (this.simulationEnding) {
+      // Simülasyon bitmişse ve sıfırlanmamışsa tekrar başlatma
+      this.addAuctionLog(
+        "Simülasyon zaten bitmiş. Sıfırlayıp yeniden başlatın."
+      );
+      console.warn("Simülasyon bitmiş, başlatılamıyor. Sıfırlayın.");
       return;
     }
     if (!this.isRunning) {
       this.isRunning = true;
-      this.simulationEnding = false;
+      // this.simulationEnding = false; // reset() içinde zaten false yapılıyor.
+      this.addAuctionLog("Simülasyon başlatılıyor...");
       console.log("Simülasyon başlatılıyor.");
       this.loop();
     } else {
       console.warn("Simülasyon zaten çalışıyor.");
+      this.addAuctionLog("Simülasyon zaten çalışıyor.");
     }
-  }
-
-  stop() {
-    this.isRunning = false;
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-    console.log("Simülasyon durduruldu.");
   }
 
   pause() {
-    this.stop();
+    if (this.isRunning) {
+      this.isRunning = false;
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
+      this.addAuctionLog("Simülasyon duraklatıldı.");
+      console.log("Simülasyon duraklatıldı.");
+    }
   }
 }

@@ -6,16 +6,18 @@ export class Job {
     this.y = y;
     this.creationTime = creationTime;
     this.duration = 0.0; // İşin tamamlanması için gereken süre (hareket süresi hariç)
+    this.baseRevenue = 0; // İşin temel geliri/müşteri ödemesi
     this.assignedWorkerId = null;
     this.startTime = null; // İşçinin işe başladığı zaman (hedefe ulaştıktan sonra)
     this.completed = false;
     this.progress = 0.0; // 0.0 ile 1.0 arası
     this.winningBid = null;
     this.estimatedTravelTime = 0.0; // İşçinin işe ulaşma süresi
+    this.timedOut = false;
   }
 
   draw(ctx) {
-    if (this.completed) {
+    if (this.completed || this.timedOut) {
       return;
     }
     ctx.beginPath();
@@ -31,7 +33,12 @@ export class Job {
     ctx.stroke();
     ctx.fillStyle = "black";
     ctx.textAlign = "center";
-    ctx.fillText(`J${this.id}`, this.x, this.y + size);
+    // İş ID'si ve Temel Gelirini göster
+    ctx.fillText(
+      `J${this.id} (R:${this.baseRevenue.toFixed(0)})`,
+      this.x,
+      this.y + size + 3
+    );
 
     // İlerleme çubuğu
     if (this.assignedWorkerId !== null) {
