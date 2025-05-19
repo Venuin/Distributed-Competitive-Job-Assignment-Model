@@ -18,10 +18,10 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 1300px;
+  max-width: 1300px; /* Ana konteyner genişliği */
   display: flex;
   flex-direction: column;
-  gap: 25px;
+  gap: 25px; /* Bölümler arası boşluk */
 }
 
 h1 {
@@ -37,21 +37,20 @@ h2 {
   margin-top: 0;
   margin-bottom: 15px;
   border-bottom: 1px solid #e0e0e0;
-  padding-bottom: 10px;
 }
 
 .simulation-layout-container {
   display: flex;
   flex-direction: row;
   gap: 25px;
-  align-items: flex-start;
+  align-items: flex-start; /* Sidebar ve canvas'ı üste hizala */
 }
 
 .canvas-wrapper {
-  flex-grow: 1;
+  flex-grow: 1; /* Canvas alanının genişlemesini sağla */
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: center; /* Canvas'ı kendi içinde ortala */
 }
 
 .canvas-wrapper h1 {
@@ -62,15 +61,15 @@ h2 {
 #simulationCanvas {
   border: 1px solid #bcccdc;
   background-color: #ffffff;
-  display: block;
+  display: block; /* Margin auto için */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
   border-radius: 4px;
 }
 
 /* Sağ Panel (Sidebar) */
 .sidebar-panel {
-  width: 300px;
-  min-width: 280px;
+  width: 300px; /* Sabit genişlik */
+  min-width: 280px; /* Esneklik için minimum genişlik */
   padding: 20px;
   background-color: #ffffff;
   border: 1px solid #dce4ec;
@@ -78,11 +77,12 @@ h2 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 20px; /* Sidebar içindeki bölümler arası boşluk */
 }
 
 .settings-panel div {
-  margin-bottom: 18px;
+  margin-bottom: 3px;
+  border-bottom: 1px groove;
 }
 .settings-panel div:last-child {
   margin-bottom: 0;
@@ -97,16 +97,16 @@ h2 {
 }
 
 .settings-panel input[type="range"] {
-  width: calc(100% - 50px);
+  width: calc(100% - 50px); /* Span'a yer bırak */
   margin-right: 10px;
   vertical-align: middle;
   cursor: pointer;
 }
 
 .settings-panel span {
-  display: inline-block;
+  display: contents;
   width: 35px;
-  text-align: right;
+  text-align: center;
   vertical-align: middle;
   font-weight: 500;
   color: #343a40;
@@ -143,9 +143,8 @@ h2 {
 }
 
 /* Bilgi Paneli */
-#infoPanel {
-}
 .info-panel-layout {
+  /* #infoPanel ID'si yerine class kullandık */
   background-color: #e9ecef;
   padding: 15px;
   border-radius: 6px;
@@ -162,26 +161,28 @@ h2 {
 }
 .info-panel-layout p strong {
   color: #495057;
-  margin-right: 5px;
+  margin-right: 5px; /* Strong ve span arası boşluk */
 }
 .info-panel-layout p:last-child {
   margin-bottom: 0;
 }
 
+/* İhale Günlüğü Bölümü */
 .auction-log-section {
   padding: 20px;
   background-color: #ffffff;
   border: 1px solid #dce4ec;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  width: 100%;
-  max-width: 1125px; /* Yaklaşık olarak canvas(800) + sidebar(300) + gap(25) = 1125px */
-  margin: 0 auto;
+  width: 100%; /* app-container'a göre tam genişlik */
+  /* max-width: 1125px; // Bu max-width app-container tarafından zaten sağlanıyor */
+  margin: 0 auto; /* Ortalama */
 }
 
 .log-panel {
+  /* #auctionLogPanel ID'si yerine class kullandık */
   height: 200px;
-  overflow-y: auto;
+  overflow-y: auto; /* Dikey kaydırma çubuğu */
   background-color: #f8f9fa;
   border: 1px solid #dee2e6;
   border-radius: 4px;
@@ -195,58 +196,93 @@ h2 {
   margin: 0 0 7px 0;
   padding-bottom: 5px;
   border-bottom: 1px dotted #ced4da;
-  word-wrap: break-word;
+  word-wrap: break-word; /* Uzun kelimeleri kır */
 }
 .log-panel p:last-child {
   border-bottom: none;
   margin-bottom: 0;
 }
 
-/* Kazanç Grafiği Bölümü */
-.earnings-chart-section {
+/* Kazanç Grafiği Bölümü (Ana ve MAB) */
+.earnings-chart-section,
+.mab-arm-chart-section {
   padding: 20px;
   background-color: #ffffff;
   border: 1px solid #dce4ec;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  width: 100%;
-  max-width: 1125px;
-  margin: 0 auto;
+  width: 100%; /* app-container'a göre tam genişlik */
+  margin: 0 auto; /* Ortalama */
+}
+
+.mab-arm-chart-section h2 {
+  /* MAB grafiği başlığını ortala */
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.worker-select-container {
+  display: flex;
+  justify-content: center; /* Dropdown'ı yatayda ortala */
+  align-items: center;
+  margin-bottom: 20px; /* Dropdown ve grafik arası boşluk */
+}
+
+.worker-select-container label {
+  margin-right: 10px;
+  font-weight: 500;
+  color: #495057;
+}
+
+#mabWorkerSelector {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 0.95em;
+  min-width: 150px; /* Dropdown için minimum genişlik */
+  cursor: pointer;
 }
 
 .chart-container {
-  width: 100%;
-  max-width: 800px;
-  margin: 20px auto 0 auto;
+  /* Her iki grafik için de ortak stil */
+  position: relative; /* Chart.js için gerekli olabilir */
+  height: 400px; /* Grafik yüksekliği */
+  width: 90%; /* Bölümün %90'ını kapla */
+  max-width: 800px; /* Maksimum genişlik (MAB grafiği için artırılabilir) */
+  margin: 20px auto 0 auto; /* Üstte boşluk, yatayda ortala */
 }
 
 /* Mobil ve Küçük Ekranlar İçin Duyarlılık (Örnek) */
 @media (max-width: 1200px) {
+  /* Geniş tabletler ve küçük laptoplar */
   .simulation-layout-container {
     flex-direction: column;
-    align-items: center;
+    align-items: center; /* Canvas ve sidebar'ı ortala */
   }
   .canvas-wrapper {
     width: 100%;
-    align-items: center;
+    align-items: center; /* Canvas'ı kendi içinde ortala */
   }
   #simulationCanvas {
-    width: 100%;
-    max-width: 800px;
-    height: auto;
+    width: 100%; /* Genişliğe sığdır */
+    max-width: 800px; /* Ama çok da büyümesin */
+    height: auto; /* Oranını koru */
   }
   .sidebar-panel {
     width: 100%;
-    max-width: 800px;
-    margin-top: 25px;
+    max-width: 800px; /* Canvas ile aynı hizada olması için */
+    margin-top: 25px; /* Üstteki elemanla boşluk */
   }
   .auction-log-section,
-  .earnings-chart-section {
-    max-width: 800px;
+  .earnings-chart-section,
+  .mab-arm-chart-section {
+    max-width: 800px; /* Diğer bölümlerle hizalı olması için */
   }
 }
 
 @media (max-width: 768px) {
+  /* Tabletler ve büyük telefonlar */
   body {
     padding: 10px;
   }
@@ -267,7 +303,7 @@ h2 {
 
   .sidebar-panel {
     padding: 15px;
-    gap: 20px;
+    gap: 15px; /* Sidebar içi boşlukları biraz azalt */
   }
   .sidebar-panel h2 {
     font-size: 1.15em;
@@ -281,24 +317,30 @@ h2 {
   }
   .settings-panel span {
     width: 30px;
+    padding: 2px 4px;
   }
 
   .controls-panel button {
     font-size: 0.9em;
     padding: 8px 12px;
   }
-  #infoPanel {
+  .info-panel-layout {
+    /* #infoPanel ID'si yerine class kullandık */
     padding: 12px;
     font-size: 0.85em;
   }
-  #infoPanel p {
+  .info-panel-layout p {
     margin: 6px 0;
   }
 
-  .auction-log-section {
+  .auction-log-section,
+  .earnings-chart-section,
+  .mab-arm-chart-section {
     padding: 15px;
   }
-  .auction-log-section h2 {
+  .auction-log-section h2,
+  .earnings-chart-section h2,
+  .mab-arm-chart-section h2 {
     font-size: 1.15em;
   }
   .log-panel {
@@ -311,30 +353,40 @@ h2 {
     padding-bottom: 4px;
   }
 
-  .earnings-chart-section {
-    padding: 15px;
-  }
-  .earnings-chart-section h2 {
-    font-size: 1.15em;
-  }
   .chart-container {
     margin-top: 15px;
+    height: 350px; /* Küçük ekranlarda grafik yüksekliğini azalt */
+  }
+  .worker-select-container {
+    flex-direction: column; /* Küçük ekranlarda label ve select alt alta gelsin */
+    align-items: flex-start;
+  }
+  .worker-select-container label {
+    margin-bottom: 5px;
+  }
+  #mabWorkerSelector {
+    width: 100%; /* Tam genişlik kaplasın */
   }
 }
 
 @media (max-width: 480px) {
+  /* Küçük telefonlar */
   .settings-panel input[type="range"] {
     width: 100%;
     margin-right: 0;
     margin-bottom: 5px;
   }
   .settings-panel span {
-    display: block;
-    width: 100%;
+    display: block; /* Span'ı yeni satıra al */
+    width: auto; /* Genişliği otomatik ayarla */
     text-align: left;
     margin-bottom: 10px;
   }
   .settings-panel label {
     margin-bottom: 5px;
+  }
+  .chart-container {
+    height: 300px; /* Daha da küçük ekranlarda grafik yüksekliğini azalt */
+    width: 100%; /* Tam genişlik */
   }
 }

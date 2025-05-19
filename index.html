@@ -24,10 +24,9 @@
                 id="numWorkersSlider"
                 name="numWorkers"
                 min="1"
-                max="20"
-                value="8"
+                max="100"
               />
-              <span id="numWorkersValue">8</span>
+              <span id="numWorkersValue">0</span>
             </div>
             <div>
               <label for="maxJobsSlider">Maksimum İş Sayısı:</label>
@@ -36,10 +35,52 @@
                 id="maxJobsSlider"
                 name="maxJobs"
                 min="5"
-                max="200"
-                value="15"
+                max="1000"
               />
-              <span id="maxJobsValue">15</span>
+              <span id="maxJobsValue">0</span>
+            </div>
+            <hr style="margin: 15px 0" />
+            <div>
+              <label for="jobSpawnRateMultiplierSlider"
+                >İş Oluşturma Hız Çarpanı:</label
+              >
+              <input
+                type="range"
+                id="jobSpawnRateMultiplierSlider"
+                name="jobSpawnRateMultiplier"
+                min="0.1"
+                max="20"
+                step="0.1"
+              />
+              <span id="jobSpawnRateMultiplierValue">0</span>
+            </div>
+            <div>
+              <label for="jobTimeoutDurationSlider"
+                >İş Zaman Aşımı Süresi (s):</label
+              >
+              <input
+                type="range"
+                id="jobTimeoutDurationSlider"
+                name="jobTimeoutDuration"
+                min="10"
+                max="300"
+                step="5"
+              />
+              <span id="jobTimeoutDurationValue">0</span>
+            </div>
+            <div>
+              <label for="jobFixedDurationSlider"
+                >Sabit İş Tamamlanma Süresi (s):</label
+              >
+              <input
+                type="range"
+                id="jobFixedDurationSlider"
+                name="jobFixedDuration"
+                min="1"
+                max="60"
+                step="1"
+              />
+              <span id="jobFixedDurationValue">0</span>
             </div>
           </div>
 
@@ -47,12 +88,15 @@
           <div class="controls-panel">
             <button id="startButton">Başlat</button>
             <button id="pauseButton">Duraklat</button>
-            <button id="resetButton">Sıfırla (Ayarları Uygula)</button>
+            <button id="resetButton">
+              Simülasyonu Sıfırla <br />
+              (Ayarları Uygula)
+            </button>
           </div>
 
           <h2>Bilgiler</h2>
           <div id="infoPanel" class="info-panel-layout">
-            <p><strong>Zaman:</strong> <span id="timeDisplay">0.0</span></p>
+            <p><strong>Zaman:</strong> <span id="timeDisplay">0.0</span>s</p>
             <p>
               <strong>Oluşturulan İşler:</strong>
               <span id="jobsCreatedDisplay">0</span>/<span id="maxJobsDisplay"
@@ -64,19 +108,42 @@
               <span id="jobsCompletedDisplay">0</span>
             </p>
             <p>
-              <strong>Toplam Kazanç:</strong>
+              <strong>Toplam Kazanç (Brüt):</strong>
               <span id="totalEarningsDisplay">0</span>
             </p>
           </div>
         </div>
       </div>
+
       <div class="auction-log-section">
         <h2>İhale Günlüğü</h2>
         <div id="auctionLogPanel" class="log-panel"></div>
       </div>
 
       <div class="earnings-chart-section">
-        <h2>İşçi Kazançları</h2>
+        <h2>İşçi Grafiği</h2>
+        <div
+          class="chart-type-selector"
+          style="text-align: center; margin-bottom: 15px"
+        >
+          <input
+            type="radio"
+            id="earningsRadio"
+            name="earningsChartType"
+            value="earnings"
+            checked
+          />
+          <label for="earningsRadio" style="margin-right: 10px"
+            >Kazançlar (Toplam)</label
+          >
+          <input
+            type="radio"
+            id="profitRadio"
+            name="earningsChartType"
+            value="profit"
+          />
+          <label for="profitRadio">Toplam Net Kâr</label>
+        </div>
         <div
           class="chart-container"
           style="
@@ -88,6 +155,28 @@
           "
         >
           <canvas id="earningsChartCanvas"></canvas>
+        </div>
+      </div>
+
+      <div class="mab-arm-chart-section">
+        <h2>Seçili İşçi için MAB Kolu Performansı</h2>
+        <div class="worker-select-container">
+          <label for="mabWorkerSelector">İşçi Seçin:</label>
+          <select id="mabWorkerSelector">
+            <option value="">İşçi Bekleniyor...</option>
+          </select>
+        </div>
+        <div
+          class="chart-container"
+          style="
+            position: relative;
+            height: 400px;
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
+          "
+        >
+          <canvas id="mabArmChartCanvas"></canvas>
         </div>
       </div>
     </div>
