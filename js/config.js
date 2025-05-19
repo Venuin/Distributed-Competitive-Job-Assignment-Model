@@ -1,4 +1,3 @@
-// js/config.js
 export const CONFIG = {
   NUM_WORKERS: 8,
   MAX_JOBS: 15,

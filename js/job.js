@@ -1,4 +1,3 @@
-// js/job.js
 export class Job {
   constructor(id, x, y, creationTime) {
     this.id = id;
@@ -33,7 +32,6 @@ export class Job {
     ctx.stroke();
     ctx.fillStyle = "black";
     ctx.textAlign = "center";
-    // İş ID'si ve Temel Gelirini göster
     ctx.fillText(
       `J${this.id} (R:${this.baseRevenue.toFixed(0)})`,
       this.x,

@@ -1,4 +1,3 @@
-// js/worker.js
 import { Utils } from "./utils.js";
 import { CONFIG } from "./config.js";
 
@@ -17,14 +16,14 @@ export class Worker {
 
     this.assigned_jobs = []; // { jobId, startTime, duration, winningBid, targetX, targetY, armKeyUsed, calculatedDistanceCost }
     this.earnings = 0.0; // Brüt kazanç (winningBid toplamı)
-    this.totalNetProfit = 0.0; // Toplam net kâr (SimulationController'da güncellenecek)
+    this.totalNetProfit = 0.0; // Toplam net kâr
     this.available = true;
     this.path = [];
     this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
 
-    // MAB Değişkenleri
     this.mabArms = this._initializeMabArms();
     this.epsilon = CONFIG.MAB_EPSILON;
+    this.mabArmAuctionStats = this._initializeMabArmAuctionStats();
   }
 
   _initializeMabArms() {
@@ -34,7 +33,7 @@ export class Worker {
     for (const d of distances) {
       for (const r of revenues) {
         arms[`${d}_${r}`] = {
-          count: 0, // Bu kol kaç kere seçildi (ve bir sonuç verdi)
+          count: 0, // Bu kol kaç kere seçildi
           value: CONFIG.MAB_INITIAL_Q_VALUE, // Bu kolun ortalama ödülü (Q-değeri)
         };
       }
@@ -42,10 +41,25 @@ export class Worker {
     return arms;
   }
 
+  // MAB kolu istatistikleri
+  _initializeMabArmAuctionStats() {
+    const stats = {};
+    const distances = ["near", "medium", "far"];
+    const revenues = ["low", "medium", "high"];
+    for (const d of distances) {
+      for (const r of revenues) {
+        stats[`${d}_${r}`] = {
+          auctionsWon: 0, // Bu kol kullanılarak kazanılan ihale sayısı
+          auctionsLost: 0, // Bu kol kullanılarak teklif verilip kaybedilen ihale sayısı
+        };
+      }
+    }
+    return stats;
+  }
+
   /**
-   * Bir işi mesafe ve gelirine göre MAB kategorisine atar.
    * @param {Job} job İş nesnesi.
-   * @returns {string | null} İşin MAB kolu adı (örn: "near_high") veya null (eğer kategorize edilemezse).
+   * @returns {string | null} İşin MAB kolu adı
    */
   _getJobCategory(job) {
     if (
@@ -78,9 +92,8 @@ export class Worker {
   }
 
   /**
-   * Belirli bir iş için teklif miktarını hesaplar.
    * @param {Job} job Teklif hesaplanacak iş nesnesi.
-   * @returns {number} Hesaplanan teklif miktarı veya teklif verilemiyorsa Infinity.
+   * @returns {number} Hesaplanan teklif miktarı
    */
   _calculateBidForJob(job) {
     if (
@@ -96,34 +109,19 @@ export class Worker {
 
     const remainingValueAfterDistanceCost = job.baseRevenue - distanceCost;
 
-    // Kalan değer üzerinden hedeflenen kârı hesapla.
-    // targetProfitPercentageFromRemaining 0 ile 1 arasında bir değer olmalı.
-    // Eğer negatif bir remainingValue varsa, desiredProfit da negatif olur,
-    // bu da workerBid'in distanceCost'tan daha düşük olmasına yol açabilir.
-    // Bu durum, işin kendisinin maliyetini bile karşılamadığı anlamına gelir.
-    // Bu tür işlere teklif vermemek veya maliyeti yansıtacak şekilde teklif vermek
-    // stratejiye bağlıdır. Mevcut durumda, teklif potansiyel olarak zararına olabilir.
     const desiredProfitFromRemaining =
       remainingValueAfterDistanceCost *
       this.targetProfitPercentageFromRemaining;
 
     let workerBid = distanceCost + desiredProfitFromRemaining;
-
-    // Teklif, tanımlanmış minimum bir değerden düşük olamaz.
     workerBid = Math.max(CONFIG.MIN_POSSIBLE_BID, workerBid);
-
-    // Teklif, işin temel gelirini aşmamalıdır (bu bir ikinci kontrol, genellikle
-    // targetProfitPercentageFromRemaining < 1 ise zaten sağlanır, ama garanti için eklenebilir).
-    // workerBid = Math.min(workerBid, job.baseRevenue);
 
     return parseFloat(workerBid.toFixed(2));
   }
 
   /**
-   * MAB (Epsilon-Greedy) kullanarak bir iş kategorisi seçer,
-   * bu kategoriye uyan ve en iyi potansiyel net kârı sunan işe teklif verir.
    * @param {Array<Job>} availableJobs Teklif verilebilecek işlerin listesi.
-   * @returns {{job: Job, bid: number, armKey: string} | null} Seçilen iş, teklif ve kullanılan MAB kolu, veya null.
+   * @returns {{job: Job, bid: number, armKey: string} | null} Seçilen iş, teklif ve kullanılan MAB kolu veya null.
    */
   selectJobAndCalculateBid(availableJobs) {
     if (!this.available || !availableJobs || availableJobs.length === 0) {
@@ -150,7 +148,6 @@ export class Worker {
     }
 
     if (activeArmsMap.size === 0) {
-      // console.log(`W${this.id}: Hiçbir uygun iş MAB kategorisine atanamadı.`);
       return null;
     }
 
@@ -160,7 +157,6 @@ export class Worker {
     if (Math.random() < this.epsilon) {
       chosenArmKey =
         activeArmKeys[Math.floor(Math.random() * activeArmKeys.length)];
-      // console.log(`W${this.id} MAB: Keşif (aktiflerden) -> ${chosenArmKey}`);
     } else {
       let bestArmKeyFromActive = null;
       let maxQValue = -Infinity;
@@ -180,17 +176,6 @@ export class Worker {
       if (!bestArmKeyFromActive || allInitialOrUntried) {
         bestArmKeyFromActive =
           activeArmKeys[Math.floor(Math.random() * activeArmKeys.length)];
-        // console.log(
-        //   `W${this.id} MAB: Sömürü (aktiflerde Q eşit/başlangıç/denenmemiş) -> Rastgele ${bestArmKeyFromActive} ${allInitialOrUntried}`
-        // );
-      } else {
-        // console.log(
-        //   `W${
-        //     this.id
-        //   } MAB: Sömürü (aktiflerden) -> ${bestArmKeyFromActive} (Q=${maxQValue.toFixed(
-        //     2
-        //   )})`
-        // );
       }
       chosenArmKey = bestArmKeyFromActive;
     }
@@ -205,7 +190,7 @@ export class Worker {
     }
 
     let bestJobForArm = null;
-    let highestPotentialNetProfitFromBid = -Infinity; // Tekliften hesaplanan potansiyel net kâr
+    let highestPotentialNetProfitFromBid = -Infinity;
     let actualBidForBestJob = Infinity;
 
     for (const job of jobsInChosenArm) {
@@ -214,15 +199,13 @@ export class Worker {
         continue;
       }
 
-      // Teklifin işin gelirini aşmamasını kontrol et. Eğer aşarsa, bu işe bu teklifle girilmemeli.
       if (bid > job.baseRevenue) {
-        // console.log(`W${this.id} J${job.id} için teklif (${bid.toFixed(0)}) geliri (${job.baseRevenue.toFixed(0)}) aşıyor. Atla.`);
         continue;
       }
 
       const distance = Utils.distance(this.x, this.y, job.x, job.y);
       const distanceCost = distance * CONFIG.COST_PER_DISTANCE_UNIT;
-      const potentialNetProfit = bid - distanceCost; // Bu, teklif ve maliyete dayalı net kâr
+      const potentialNetProfit = bid - distanceCost;
 
       if (potentialNetProfit > highestPotentialNetProfitFromBid) {
         highestPotentialNetProfitFromBid = potentialNetProfit;
@@ -232,42 +215,37 @@ export class Worker {
     }
 
     if (bestJobForArm && highestPotentialNetProfitFromBid >= 0) {
-      // Sadece pozitif veya sıfır kârlı işlere teklif ver
-      // console.log(
-      //   `W${this.id} MAB: Kol ${chosenArmKey} -> J${
-      //     bestJobForArm.id
-      //   } için teklif: ${actualBidForBestJob.toFixed(
-      //     0
-      //   )} (Pot. Net Kâr: ${highestPotentialNetProfitFromBid.toFixed(2)})`
-      // );
       return {
         job: bestJobForArm,
         bid: actualBidForBestJob,
         armKey: chosenArmKey,
       };
     } else {
-      // console.log(
-      //   `W${this.id} MAB: Kol ${chosenArmKey} için kârlı (>=0) iş bulunamadı. En yüksek potansiyel net kâr: ${highestPotentialNetProfitFromBid.toFixed(2)}`
-      // );
       return null;
     }
   }
 
   /**
-   * Bir MAB kolunun istatistiklerini (seçim sayısı ve ortalama ödül) günceller.
-   * @param {string} armKey Güncellenecek kolun adı (örn: "near_high").
-   * @param {number} reward Bu seçimden elde edilen ödül (net kâr).
+   * @param {string} armKey Güncellenecek kolun adı
+   * @param {number} reward Bu seçimden elde edilen ödül (net kâr)
+   * @param {boolean} auctionWon İhale bu kol kullanılarak kazanıldı mı?
    */
-  updateMabArm(armKey, reward) {
+  updateMabArm(armKey, reward, auctionWon) {
     if (this.mabArms[armKey]) {
       const arm = this.mabArms[armKey];
-      arm.count++;
-      // Q-değeri güncelleme: Q_new = Q_old + (1/N) * (R - Q_old)
-      arm.value = arm.value + (1 / arm.count) * (reward - arm.value);
+
+      if (auctionWon) {
+        arm.count++;
+        arm.value = arm.value + (1 / arm.count) * (reward - arm.value);
+      }
+
+      if (this.mabArmAuctionStats[armKey] && auctionWon) {
+        this.mabArmAuctionStats[armKey].auctionsWon++;
+      }
       // console.log(
       //   `W${this.id} MAB Güncelleme: Kol=${armKey}, Sayac=${
       //     arm.count
-      //   }, Yeni Q-Değeri=${arm.value.toFixed(2)}, Ödül=${reward.toFixed(2)}`
+      //   }, Yeni Q-Değeri=${arm.value.toFixed(2)}, Ödül=${reward.toFixed(2)}, Kazanıldı: ${auctionWon}`
       // );
     } else {
       console.warn(
@@ -277,8 +255,6 @@ export class Worker {
   }
 
   /**
-   * MAB kollarının mevcut durumunu (Q-değerleri ve seçim sayıları) döndürür.
-   * Grafik çizimi için kullanılacak.
    * @returns {Object} { armKey: { value: number, count: number }, ... }
    */
   getMabArmData() {
@@ -290,6 +266,13 @@ export class Worker {
       };
     }
     return armData;
+  }
+
+  /**
+   * @returns {Object} { armKey: { auctionsWon: number, auctionsLost: number }, ... }
+   */
+  getMabArmAuctionStats() {
+    return this.mabArmAuctionStats;
   }
 
   moveToTarget(timeStep) {
@@ -308,17 +291,13 @@ export class Worker {
       if (distanceToTargetPoint <= travelDistanceInStep) {
         this.x = targetPos.x;
         this.y = targetPos.y;
-        // Eğer bu path'teki son noktaysa, path'i temizleyebilir veya
-        // bir sonraki noktaya geçişi burada yönetebilirsiniz.
-        // Mevcut mantıkta, path[0] her zaman güncel hedeftir.
-        // İşe varıldığında path AuctionManager veya SimulationController'da temizlenir.
       } else {
         const angle = Math.atan2(deltaY, deltaX);
         this.x += Math.cos(angle) * travelDistanceInStep;
         this.y += Math.sin(angle) * travelDistanceInStep;
       }
     }
-    // Canvas sınırları içinde kalmasını sağla
+    // Sınır kontrolü
     this.x = Math.max(0, Math.min(this.canvasWidth, this.x));
     this.y = Math.max(0, Math.min(this.canvasHeight, this.y));
   }
@@ -327,26 +306,24 @@ export class Worker {
     const workerRadius = 7;
     ctx.beginPath();
     ctx.arc(this.x, this.y, workerRadius, 0, Math.PI * 2);
-    ctx.fillStyle = this.available ? this.color : "rgba(220, 50, 50, 0.8)"; // Meşgulse farklı renk
+    ctx.fillStyle = this.available ? this.color : "rgba(220, 50, 50, 0.8)";
     ctx.fill();
     ctx.strokeStyle = "black";
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // İşçi ID'sini yazdır
     ctx.fillStyle = "white";
     ctx.font = "bold 8px Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(`W${this.id}`, this.x, this.y);
 
-    // Eğer işçi meşgulse ve bir hedefi varsa, hedefe doğru bir çizgi çiz
     if (
       !this.available &&
       this.path.length > 0 &&
       this.assigned_jobs.length > 0
     ) {
-      const currentAssignment = this.assigned_jobs[0]; // İlk atanmış işe gider
+      const currentAssignment = this.assigned_jobs[0];
       if (
         currentAssignment &&
         typeof currentAssignment.targetX !== "undefined" &&
@@ -355,7 +332,7 @@ export class Worker {
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(currentAssignment.targetX, currentAssignment.targetY);
-        ctx.strokeStyle = "rgba(100, 100, 100, 0.4)"; // Soluk bir çizgi
+        ctx.strokeStyle = "rgba(100, 100, 100, 0.4)";
         ctx.lineWidth = 1;
         ctx.stroke();
       }

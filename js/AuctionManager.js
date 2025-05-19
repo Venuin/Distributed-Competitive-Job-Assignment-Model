@@ -1,10 +1,9 @@
-// js/AuctionManager.js
 import { Utils } from "./utils.js";
-import { CONFIG } from "./config.js"; // CONFIG'i import et
+import { CONFIG } from "./config.js";
 
 export class AuctionManager {
   constructor(simulationController) {
-    this.sim = simulationController; // Ana SimulationController'a erişim için
+    this.sim = simulationController;
     this.timeSinceLastAuction = 0.0;
   }
 
@@ -15,7 +14,6 @@ export class AuctionManager {
   update(timeStep) {
     this.timeSinceLastAuction += timeStep;
     if (this.timeSinceLastAuction >= CONFIG.AUCTION_INTERVAL) {
-      // CONFIG'den alınıyor
       this.runAuctionRound();
       this.timeSinceLastAuction = 0.0;
     }
@@ -30,16 +28,16 @@ export class AuctionManager {
     job.assignedWorkerId = worker.id;
     job.winningBid = bidAmount;
     job.estimatedTravelTime = this.calculateJobTravelTime(worker, job);
-    job.startTime = null; // İşe varınca set edilecek
+    job.startTime = null;
     job.progress = 0;
 
     const distanceToJob = Utils.distance(worker.x, worker.y, job.x, job.y);
-    const distanceCostForJob = distanceToJob * CONFIG.COST_PER_DISTANCE_UNIT; // CONFIG'den
+    const distanceCostForJob = distanceToJob * CONFIG.COST_PER_DISTANCE_UNIT;
 
     worker.assigned_jobs.push({
       jobId: job.id,
       startTime: null,
-      duration: job.duration, // Bu, job nesnesinden gelir (CONFIG.JOB_FIXED_DURATION ile set edilir)
+      duration: job.duration,
       winningBid: bidAmount,
       targetX: job.x,
       targetY: job.y,
@@ -59,39 +57,30 @@ export class AuctionManager {
       const job = this.sim.jobs[i];
       if (job.assignedWorkerId === null && !job.completed && !job.timedOut) {
         if (currentTime - job.creationTime > CONFIG.JOB_TIMEOUT_DURATION) {
-          // CONFIG'den
           job.timedOut = true;
           this.sim.chartManager.addAuctionLog(
             `ZAMAN AŞIMI: J${job.id} (R:${job.baseRevenue.toFixed(
               0
             )}) ${CONFIG.JOB_TIMEOUT_DURATION.toFixed(
-              // CONFIG'den
-              1 // Süreyi ondalıklı gösterebiliriz
+              1
             )}s boyunca atanmadığı için kaldırıldı.`
           );
           timedOutCount++;
         }
       }
-      // Zaman aşımına uğramayan veya zaten atanmış/tamamlanmış işleri yeni listeye ekle
       if (!job.timedOut) {
-        // Sadece zaman aşımına uğramayanları tut
         newJobsList.push(job);
       }
-      // Not: Tamamlanmış işler zaten çizilmiyor ve worker'ın assigned_jobs listesinden çıkarılıyor.
-      // Bu döngü, `this.sim.jobs` listesini temizlemek için.
     }
 
     if (timedOutCount > 0) {
-      this.sim.jobs = newJobsList; // Simülasyonun ana iş listesini güncelle
+      this.sim.jobs = newJobsList;
     }
   }
 
   runAuctionRound() {
     this.checkJobTimeouts();
-    this.sim.chartManager.addAuctionLog(
-      // Loglama ChartManager üzerinden
-      `--- Yeni İhale Turu Başladı ---` // Zaman damgası ChartManager.addAuctionLog içinde ekleniyor
-    );
+    this.sim.chartManager.addAuctionLog(`--- Yeni İhale Turu Başladı ---`);
 
     const openForBiddingJobs = this.sim.jobs.filter(
       (job) => !job.completed && job.assignedWorkerId === null && !job.timedOut
@@ -132,7 +121,7 @@ export class AuctionManager {
         choice.job &&
         typeof choice.job.id !== "undefined" &&
         isFinite(choice.bid) &&
-        choice.bid > 0 && // Teklif pozitif olmalı
+        choice.bid > 0 &&
         choice.armKey
       ) {
         potentialBids.push({
@@ -192,7 +181,7 @@ export class AuctionManager {
         continue;
 
       const jobBids = bidsByJob[jobIdStr];
-      jobBids.sort((a, b) => a.bid - b.bid); // En düşük teklif önce gelir (ikinci fiyat ihalesi gibi değil, en düşük teklif kazanır mantığı)
+      jobBids.sort((a, b) => a.bid - b.bid);
 
       let bidsDetailMsg = `J${job.id} (R:${job.baseRevenue.toFixed(
         0
@@ -202,40 +191,74 @@ export class AuctionManager {
       this.sim.chartManager.addAuctionLog(bidsDetailMsg);
 
       let assignedThisJob = false;
-      for (const bestBidEntry of jobBids) {
-        if (bestBidEntry.worker.available) {
+      let winningBidEntry = null;
+
+      for (const currentBidEntry of jobBids) {
+        if (currentBidEntry.worker.available) {
           this.assignJobToWorker(
             job,
-            bestBidEntry.worker,
-            bestBidEntry.bid,
-            bestBidEntry.armKey
+            currentBidEntry.worker,
+            currentBidEntry.bid,
+            currentBidEntry.armKey
           );
           assignedDetailsLogArray.push(
             `J${job.id} -> W${
-              bestBidEntry.worker.id
-            } (Teklif: ${bestBidEntry.bid.toFixed(0)}, Kol:${
-              bestBidEntry.armKey
+              currentBidEntry.worker.id
+            } (Teklif: ${currentBidEntry.bid.toFixed(0)}, Kol:${
+              currentBidEntry.armKey
             })`
           );
           jobsAssignedThisRoundCount++;
           assignedThisJob = true;
-          break;
+          winningBidEntry = currentBidEntry;
+          break; // Bu iş için atama yapıldı, sonraki işe geç.
         }
       }
-      if (!assignedThisJob && jobBids.length > 0) {
+
+      // Eğer bir kazanan varsa, kaybedenlerin MAB istatistiklerini güncelle
+      if (winningBidEntry) {
+        for (const bidEntry of jobBids) {
+          if (bidEntry.worker.id !== winningBidEntry.worker.id) {
+            if (
+              bidEntry.armKey &&
+              bidEntry.worker.mabArmAuctionStats &&
+              bidEntry.worker.mabArmAuctionStats[bidEntry.armKey]
+            ) {
+              bidEntry.worker.mabArmAuctionStats[bidEntry.armKey]
+                .auctionsLost++;
+              this.sim.chartManager.addAuctionLog(
+                `W${bidEntry.worker.id}, J${job.id} için ihaleyi (Kol:${bidEntry.armKey}) kaybetti.`
+              );
+            }
+          }
+        }
+      } else if (jobBids.length > 0 && !assignedThisJob) {
+        // Teklifler vardı ama kazanan olmadı
         this.sim.chartManager.addAuctionLog(
           `J${job.id} için kazanan atanamadı (teklif verenler meşgul olabilir).`
         );
+        for (const bidEntry of jobBids) {
+          if (
+            bidEntry.armKey &&
+            bidEntry.worker.mabArmAuctionStats &&
+            bidEntry.worker.mabArmAuctionStats[bidEntry.armKey]
+          ) {
+            bidEntry.worker.mabArmAuctionStats[bidEntry.armKey].auctionsLost++;
+            this.sim.chartManager.addAuctionLog(
+              `W${bidEntry.worker.id}, J${job.id} için verdiği teklif (Kol:${bidEntry.armKey}) sonuçsuz kaldı (kazanan yok).`
+            );
+          }
+        }
       }
     }
+
     if (jobsAssignedThisRoundCount > 0) {
       this.sim.chartManager.addAuctionLog(
         `Atanan İşler: ${assignedDetailsLogArray.join(" | ")}`
       );
     } else if (potentialBids.length > 0) {
-      // Teklif vardı ama atama olmadıysa
       this.sim.chartManager.addAuctionLog(
-        "Bu turda teklifler oldu ancak hiçbir iş atanamadı (örneğin, teklif veren tüm işçiler başka işlere atandı)."
+        "Bu turda teklifler oldu ancak hiçbir iş atanamadı."
       );
     }
     this.sim.chartManager.addAuctionLog("--- İhale Turu Bitti ---");

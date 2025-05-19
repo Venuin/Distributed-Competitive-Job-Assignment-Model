@@ -1,14 +1,12 @@
-// js/SimulationController.js
 import { Worker } from "./worker.js";
 import { Job } from "./job.js";
 import { Utils } from "./utils.js";
-import { CONFIG } from "./config.js"; // CONFIG'i import ediyoruz
+import { CONFIG } from "./config.js";
 import { ChartManager } from "./ChartManager.js";
 import { AuctionManager } from "./AuctionManager.js";
 
 export class SimulationController {
   constructor(canvasId, infoPanelIds) {
-    // chartCanvasId parametresine gerek yok, ChartManager kendi ID'sini bilir
     this.canvas = document.getElementById(canvasId);
     if (!this.canvas) {
       console.error(
@@ -35,20 +33,12 @@ export class SimulationController {
     this.animationFrameId = null;
     this.isRunning = false;
     this.simulationEnding = false;
-
-    // currentNumWorkers ve currentMaxJobs reset metodunda CONFIG'den alınacak.
-    // Bu yüzden constructor'da başlangıç atamasına gerek yok.
-    // this.currentNumWorkers = CONFIG.NUM_WORKERS;
-    // this.currentMaxJobs = CONFIG.MAX_JOBS;
   }
 
   reset(numWorkers, maxJobs) {
-    // Sadece temel parametreler, diğerleri CONFIG'den
     if (!this.validInitialization) return;
     this.pause();
 
-    // numWorkers ve maxJobs parametreleri main.js'deki slider'lardan geliyor.
-    // Diğer ayarlar (JOB_SPAWN_RATE_MULTIPLIER vb.) zaten main.js'de CONFIG nesnesine yazıldı.
     this.currentNumWorkers = parseInt(numWorkers, 10);
     this.currentMaxJobs = parseInt(maxJobs, 10);
 
@@ -71,7 +61,7 @@ export class SimulationController {
           i,
           Math.random() * this.canvas.width,
           Math.random() * this.canvas.height,
-          CONFIG.BASE_WORKER_SPEED, // CONFIG'den
+          CONFIG.BASE_WORKER_SPEED,
           this.canvas.width,
           this.canvas.height
         )
@@ -122,12 +112,12 @@ export class SimulationController {
         Math.random() * (this.canvas.height - 2 * padding) + padding;
       const newJob = new Job(this.jobCounter, newJobX, newJobY, this.time);
 
-      newJob.duration = CONFIG.JOB_FIXED_DURATION; // CONFIG'den
+      newJob.duration = CONFIG.JOB_FIXED_DURATION;
       newJob.baseRevenue =
         Math.random() *
-          (CONFIG.MAX_REVENUE_FOR_JOB_SPAWN - // CONFIG'den
-            CONFIG.MIN_REVENUE_FOR_JOB_SPAWN) + // CONFIG'den
-        CONFIG.MIN_REVENUE_FOR_JOB_SPAWN; // CONFIG'den
+          (CONFIG.MAX_REVENUE_FOR_JOB_SPAWN -
+            CONFIG.MIN_REVENUE_FOR_JOB_SPAWN) +
+        CONFIG.MIN_REVENUE_FOR_JOB_SPAWN;
 
       this.jobs.push(newJob);
       this.jobCounter++;
@@ -165,7 +155,7 @@ export class SimulationController {
           worker.path = [];
           if (worker.available && worker.assigned_jobs.length === 0) {
             this.chartManager.addAuctionLog(
-              `W${worker.id} uygun hale geldi (atanan işi J${currentAssignment.jobId} bulunamadı/zaman aşımına uğradı/tamamlandı).`
+              `W${worker.id} uygun hale geldi (atanan işi J${currentAssignment.jobId} bulunamadı/kaldırıldı).`
             );
           }
           continue;
@@ -209,21 +199,23 @@ export class SimulationController {
                 this.completedJobs.push(job);
               }
 
-              worker.earnings += currentAssignment.winningBid;
+              worker.earnings += currentAssignment.winningBid; // Brüt kazanç
 
               const netProfitForThisJob =
                 currentAssignment.winningBid -
-                currentAssignment.calculatedDistanceCost;
+                currentAssignment.calculatedDistanceCost; // net kâr
 
-              worker.totalNetProfit += netProfitForThisJob;
+              worker.totalNetProfit += netProfitForThisJob; // İşçinin toplam net kârı
 
+              // MAB kolunu güncelleme
               if (
                 currentAssignment.armKeyUsed &&
                 typeof worker.updateMabArm === "function"
               ) {
                 worker.updateMabArm(
                   currentAssignment.armKeyUsed,
-                  netProfitForThisJob
+                  netProfitForThisJob,
+                  true
                 );
               }
 
@@ -254,14 +246,14 @@ export class SimulationController {
                     `W${worker.id}, sıradaki iş J${nextJobToAssign.id}'ye yöneliyor.`
                   );
                 } else {
-                  worker.available = true;
+                  worker.available = true; // Sıradaki iş geçersizse uygun hale gel
                   worker.path = [];
                   this.chartManager.addAuctionLog(
                     `W${worker.id} uygun (sırada bekleyen iş J${nextAssignment.jobId} geçersiz/bulunamadı).`
                   );
                 }
               } else {
-                worker.path = [];
+                worker.path = []; // Tüm işler bitti, path'i temizle
                 this.chartManager.addAuctionLog(
                   `W${worker.id} uygun (tüm atanmış işler bitti).`
                 );
@@ -270,7 +262,9 @@ export class SimulationController {
           }
         }
       } else {
-        worker.available = true;
+        if (worker.assigned_jobs.length === 0 && !worker.available) {
+          worker.available = true;
+        }
       }
     }
   }
@@ -282,11 +276,11 @@ export class SimulationController {
 
     if (
       !this.allJobsCreated &&
-      this.jobCounter < this.currentMaxJobs && // this.currentMaxJobs kullanılmalı
+      this.jobCounter < this.currentMaxJobs &&
       Math.random() <
         CONFIG.JOB_CREATION_PROBABILITY *
           timeStep *
-          (CONFIG.JOB_SPAWN_RATE_MULTIPLIER || 1) // CONFIG'den
+          (CONFIG.JOB_SPAWN_RATE_MULTIPLIER || 1)
     ) {
       this.spawnNewJob();
     }
@@ -294,12 +288,16 @@ export class SimulationController {
     this.auctionManager.update(timeStep);
     this.updateWorkers(timeStep);
 
+    // Simülasyon bitiş kontrolü
     if (
       this.allJobsCreated &&
-      this.jobs.filter((job) => !job.completed && !job.timedOut).length === 0
+      this.jobs.filter((job) => !job.completed && !job.timedOut).length === 0 &&
+      this.workers.every(
+        (worker) => worker.available && worker.assigned_jobs.length === 0
+      )
     ) {
       if (!this.simulationEnding) {
-        const logMsg = `TÜM İŞLER (${this.completedJobs.length}/${this.currentMaxJobs} tamamlandı) YA DA KALANLAR ZAMAN AŞIMINA UĞRADI! Simülasyon durduruluyor.`;
+        const logMsg = `TÜM İŞLER (${this.completedJobs.length}/${this.currentMaxJobs} tamamlandı, geri kalanı zaman aşımına uğradı) VE TÜM İŞÇİLER BOŞTA! Simülasyon durduruluyor.`;
         console.log(logMsg);
         this.chartManager.addAuctionLog(logMsg);
         this.simulationEnding = true;
@@ -327,7 +325,7 @@ export class SimulationController {
   loop() {
     if (!this.isRunning) return;
 
-    this.simulateStep(CONFIG.TIME_STEP); // CONFIG'den
+    this.simulateStep(CONFIG.TIME_STEP);
     this.draw();
 
     if (this.simulationEnding && this.isRunning) {
